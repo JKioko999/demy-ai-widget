@@ -287,7 +287,7 @@
         if (!response.ok) throw new Error('HTTP ' + response.status);
 
         var data     = await response.json();
-        var botReply = data.reply || 'Sorry, I could not process that. Please try again.';
+        var botReply = data.data || 'Sorry, I could not process that. Please try again.';
 
         hideTypingIndicator();
 
