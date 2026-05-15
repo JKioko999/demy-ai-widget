@@ -7,7 +7,7 @@
   'use strict';
 
   // ─── CONFIGURATION ────────────────────────────────────────
-  const WEBHOOK_URL       = 'https://n8n-service-5mdm.onrender.com/webhook/demy-ai/chat';
+  const WEBHOOK_URL       = 'https://n8n-production-e7fa0.up.railway.app/webhook/demy-ai/chat';
   const WIDGET_VERSION    = '1.0.0';
   const STORAGE_KEY_PREFIX = 'demy_ai_';
   const RECONNECT_DELAY_MS = 3000;
