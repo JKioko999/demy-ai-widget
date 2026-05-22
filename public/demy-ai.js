@@ -1,17 +1,17 @@
 /*!
  * Demy AI - Website Chat Widget
- * Version: 1.0.0
+ * Version: 1.1.0
  * https://demyai.com
  */
 (function (window, document) {
   'use strict';
 
   // ─── CONFIGURATION ────────────────────────────────────────
-  const WEBHOOK_URL       = 'https://n8n-production-e7fa0.up.railway.app/webhook/demy-ai/chat';
-  const WIDGET_VERSION    = '1.0.0';
+  const WEBHOOK_URL        = 'https://n8n-production-e7fa0.up.railway.app/webhook/demy-ai/chat';
+  const WIDGET_VERSION     = '1.1.0';
   const STORAGE_KEY_PREFIX = 'demy_ai_';
   const RECONNECT_DELAY_MS = 3000;
-  const MAX_RETRIES       = 3;
+  const MAX_RETRIES        = 3;
 
   // ─── READ SCRIPT ATTRIBUTES ───────────────────────────────
   const currentScript = document.currentScript || (function () {
@@ -67,11 +67,11 @@
   }
 
   // ─── STATE ────────────────────────────────────────────────
-  var sessionId   = getSessionId();
-  var messages    = loadHistory();
-  var isOpen      = false;
-  var isTyping    = false;
-  var retryCount  = 0;
+  var sessionId  = getSessionId();
+  var messages   = loadHistory();
+  var isOpen     = false;
+  var isTyping   = false;
+  var retryCount = 0;
 
   // ─── STYLES ───────────────────────────────────────────────
   function injectStyles() {
@@ -100,9 +100,14 @@
       '.demy-msg-row{display:flex;flex-direction:column;gap:2px;}',
       '.demy-msg-row.demy-user{align-items:flex-end;}',
       '.demy-msg-row.demy-bot{align-items:flex-start;}',
-      '.demy-bubble{max-width:82%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.55;word-wrap:break-word;}',
+      '.demy-bubble{max-width:82%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.65;word-wrap:break-word;}',
       '.demy-bubble.demy-user{background:' + BOT_COLOR + ';color:#fff;border-bottom-right-radius:4px;}',
       '.demy-bubble.demy-bot{background:#f1f3f4;color:#1a1a1a;border-bottom-left-radius:4px;}',
+      // ── Markdown rendering styles ──
+      '.demy-bubble.demy-bot strong{font-weight:700;color:#111;}',
+      '.demy-bubble.demy-bot .demy-list-item{display:block;padding:3px 0 3px 4px;border-left:2px solid ' + BOT_COLOR + ';margin:4px 0;font-size:13px;}',
+      '.demy-bubble.demy-bot .demy-divider{border:none;border-top:1px solid #e0e0e0;margin:8px 0;}',
+      // ──────────────────────────────
       '.demy-timestamp{font-size:10px;color:#bbb;padding:0 4px;}',
       '.demy-typing-indicator{display:flex;align-items:center;gap:4px;padding:10px 14px;background:#f1f3f4;border-radius:16px;border-bottom-left-radius:4px;width:fit-content;}',
       '.demy-dot{width:7px;height:7px;background:#aaa;border-radius:50%;animation:demy-pulse 1.2s infinite ease-in-out;}',
@@ -181,9 +186,69 @@
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  // ─── FORMAT MESSAGE — renders markdown-like syntax ────────
   function formatMessage(text) {
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    if (!text) return '';
+
+    // 1. Escape HTML first to prevent XSS
+    var escaped = escapeHtml(text);
+
+    // 2. Convert **bold** → <strong>bold</strong>
+    escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // 3. Convert *italic* → <em>italic</em>
+    escaped = escaped.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+
+    // 4. Split into lines for list detection
+    var lines = escaped.split(/\n/);
+    var result = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+
+      if (line === '') {
+        // Empty line — add a small spacer only if not at start/end
+        if (i > 0 && i < lines.length - 1) {
+          result.push('<br>');
+        }
+        continue;
+      }
+
+      // Detect numbered list items: "1. " "2. " etc
+      var numberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+      if (numberedMatch) {
+        result.push(
+          '<span class="demy-list-item">' +
+          '<strong>' + numberedMatch[1] + '.</strong> ' +
+          numberedMatch[2] +
+          '</span>'
+        );
+        continue;
+      }
+
+      // Detect bullet list items: "- " or "• "
+      var bulletMatch = line.match(/^[-•]\s+(.+)$/);
+      if (bulletMatch) {
+        result.push(
+          '<span class="demy-list-item">• ' + bulletMatch[1] + '</span>'
+        );
+        continue;
+      }
+
+      // Detect separator lines: "---" or "==="
+      if (/^[-=]{3,}$/.test(line)) {
+        result.push('<hr class="demy-divider">');
+        continue;
+      }
+
+      // Regular line
+      result.push(line + (i < lines.length - 1 ? '<br>' : ''));
+    }
+
+    // Clean up consecutive <br> tags (max 1)
+    return result.join('').replace(/(<br>){2,}/g, '<br>');
   }
+  // ──────────────────────────────────────────────────────────
 
   function scrollToBottom() {
     var c = document.getElementById('demy-ai-messages');
@@ -296,7 +361,7 @@
         saveHistory(messages);
         renderMessage('bot', botReply);
 
-        success = true;
+        success    = true;
         retryCount = 0;
         showError(false);
 
